@@ -199,11 +199,25 @@ class ForwardingBot:
             f"Currently monitoring the following channels:\n\n{channels_text}"
         )
 
+    def has_media_attachment(self, message) -> bool:
+        """Check if a message has any media attachments."""
+        if not message:
+            return False
+            
+        # Check for various types of media attachments
+        media_attributes = [
+            'photo', 'video', 'document', 'audio', 'animation',
+            'sticker', 'voice', 'video_note', 'contact', 'location',
+            'venue', 'poll', 'dice', 'game', 'invoice', 'successful_payment'
+        ]
+        
+        return any(getattr(message, attr, None) for attr in media_attributes)
+
     async def forward_message(
         self, update: Update, context: ContextTypes.DEFAULT_TYPE
     ) -> None:
         """Forward messages from source channels to the target channel."""
-        if not update.effective_chat:
+        if not update.effective_chat or not update.effective_message:
             return
 
         # Get the chat ID of the source channel
@@ -221,12 +235,17 @@ class ForwardingBot:
         ):
             logger.debug(f"Message from non-monitored channel: {source_identifier}")
             return
+            
+        # Check if the message has media attachments
+        if not self.has_media_attachment(update.effective_message):
+            logger.info(f"Skipping plain text message from {source_identifier}")
+            return
 
         # Forward the message to the target channel
         try:
             await update.effective_message.forward(chat_id=self.target_channel)
             logger.info(
-                f"Message forwarded from {source_identifier} to {self.target_channel}"
+                f"Message with media forwarded from {source_identifier} to {self.target_channel}"
             )
         except Exception as e:
             logger.error(f"Error forwarding message: {e}")
